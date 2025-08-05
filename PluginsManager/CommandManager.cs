@@ -95,35 +95,45 @@ namespace PluginsManager
             return data;
         }
 
-        private void GetExternalCommandsFromAssembly(string folderPath)
+private void GetExternalCommandsFromAssembly(string folderPath)
+{
+    try
+    {
+        var dllFiles = Directory.GetFiles(folderPath, "*.dll");
+        var subFolders = Directory.GetDirectories(folderPath);
+        foreach (var subFolder in subFolders)
+        {
+            dllFiles = dllFiles.Concat(Directory.GetFiles(subFolder, "*.dll")).ToArray();
+        }
+
+        foreach (var dllFile in dllFiles)
         {
             try
             {
-                var dllFiles = Directory.GetFiles(folderPath, "*.dll");
-                var subFolders = Directory.GetDirectories(folderPath);
-                foreach (var subFolder in subFolders)
+                var assemblyBytes = File.ReadAllBytes(dllFile);
+                var assembly = Assembly.Load(assemblyBytes);
+
+                IEnumerable<Type> externalCommands = assembly.GetTypes()
+                    .Where(type => typeof(IExternalCommand).IsAssignableFrom(type) && !type.IsAbstract && !type.IsInterface);
+
+                AllTypes.AddRange(externalCommands);
+
+                foreach (var type in externalCommands)
                 {
-                    dllFiles = dllFiles.Concat(Directory.GetFiles(subFolder, "*.dll")).ToArray();
+                    FillCommandsDictionaryAndList(type, assembly);
                 }
-                foreach (var dllFile in dllFiles)
-                {
-                    var assemblyBytes = File.ReadAllBytes(dllFile);
-                    var assembly = Assembly.Load(assemblyBytes);
-
-                    IEnumerable<Type> externalCommands = assembly.GetTypes()
-                        .Where(type => typeof(IExternalCommand).IsAssignableFrom(type) && !type.IsAbstract);
-
-                    AllTypes.AddRange(externalCommands);
-
-                    foreach (var type in externalCommands)
-                    {
-                        FillCommandsDictionaryAndList(type, assembly);
-                    }
-                }
-                SortCommandsDictionary();
             }
-            catch { }
+            catch
+            {
+            }
+
         }
+        SortCommandsDictionary();
+    }
+    catch 
+    {
+    }
+}
 
         private void FillCommandsDictionaryAndList(Type type, Assembly assembly)
         {
